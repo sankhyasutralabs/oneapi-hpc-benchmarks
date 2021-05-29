@@ -77,7 +77,7 @@ main()
   auto elapsed = toc - tic;
   auto duration = std::chrono::duration<double, std::nano>(elapsed).count() * 1e-9;
 
-  std::cout << duration << ", " << T[idx(1,1,1)] << std::endl;
+  std::cout << NX << ", " << duration << ", " << T[idx(1,1,1)] << std::endl;
 
   free(T);
   free(Tnew);
