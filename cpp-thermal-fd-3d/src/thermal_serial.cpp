@@ -47,6 +47,7 @@ main()
     for (size_t y = 0; y <= NY+1; y++) {
       for (size_t x = 0; x <= NX+1; x++) {
         T[idx(x,y,z)] = 100.0;
+        Tnew[idx(x,y,z)] = 100.0;
       }
     }
   }
@@ -54,6 +55,7 @@ main()
     for (size_t y = 1; y <= NY; y++) {
       for (size_t x = 1; x <= NX; x++) {
         T[idx(x,y,z)] = 0.0;
+        Tnew[idx(x,y,z)] = 0.0;
       }
     }
   }
