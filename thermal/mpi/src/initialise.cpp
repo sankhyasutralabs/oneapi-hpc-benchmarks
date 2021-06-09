@@ -1,6 +1,6 @@
-#include "initialise.h"
-#include "config.h"
-#include <stdlib.h>
+#include "initialise.hpp"
+#include "config.hpp"
+#include <cstdlib>
 
 inline size_t
 idx(size_t x, size_t y, size_t z, size_t npx, size_t npy, size_t npz)
@@ -9,7 +9,7 @@ idx(size_t x, size_t y, size_t z, size_t npx, size_t npy, size_t npz)
 }
 
 void
-initialise(REAL* T, size_t npx, size_t npy, size_t npz, size_t np, double Tbulk, double Tbc)
+initialise(VARTYPE* T, size_t npx, size_t npy, size_t npz, size_t np, VARTYPE Tbulk, VARTYPE Tbc)
 {
   for (size_t z = 0; z <= npz-1; z++) {
     for (size_t y = 0; y <= npy-1; y++) {
@@ -24,6 +24,16 @@ initialise(REAL* T, size_t npx, size_t npy, size_t npz, size_t np, double Tbulk,
         T[idx(x,y,z,npx,npy,npz)] = Tbulk;
       }
     }
+  }
+  return;
+}
+
+void
+initialise_blocks(VARTYPE* T, size_t npx, size_t npy, size_t npz, size_t np, size_t nbx, size_t nby, size_t nbz, VARTYPE Tbulk, VARTYPE Tbc)
+{
+  const size_t bsize = npx * npy * npz;
+  for (size_t b = 0; b < (nbx * nby * nbz); b++) {
+    initialise(&T[bsize * b], npx, npy, npz, np, Tbulk, Tbc);
   }
   return;
 }
