@@ -1,12 +1,10 @@
-# Benchmarks
+# Thermal Solver Benchmarks
 
 Tested on:
 
 - 2S Intel Xeon 8360Y Ice Lake
 - 16 x 16 GB DDR4 3200 MT/s
 - Theoretical Memory Bandwidth = 410 GB/s
-
-# Thermal Solver
 
 ## C++ with MPI
 
@@ -22,7 +20,7 @@ mpirun -n 72 --bind-to core:1 ./bin/thermal_mpi nx ny nz nbx nby nbz nt
 ### Case: One large block
 
 ```
-cd thermal/mpi
+cd thermal
 bash scripts/compile.sh
 
 mpirun -n 72 --bind-to core:1 ./bin/thermal_mpi 256 256 256 1 1 1 10
@@ -40,7 +38,7 @@ mpirun -n 72 --bind-to core:1 ./bin/thermal_mpi 256 256 256 1 1 1 10
 ### Case: Many small blocks
 
 ```
-cd thermal/mpi
+cd thermal
 bash scripts/compile.sh
 
 mpirun -n 72 --bind-to core:1 ./bin/thermal_mpi 8 8 8 32 32 32 10
@@ -60,7 +58,7 @@ A grid with `(nbx,nby,nbz)` blocks, each block containing
 `(nx,ny,nz)` grid points, is distributed across all threads.
 
 ```
-cd thermal/dpcpp
+cd thermal
 bash scripts/compile.sh
 
 ./bin/thermal_dpcpp 8 8 8 135 135 135 10
