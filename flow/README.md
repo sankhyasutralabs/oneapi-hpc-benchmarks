@@ -25,7 +25,7 @@ mpirun -n 72 --bind-to core:1 ./bin/flow_mpi nx ny nz nbx nby nbz nt
 cd flow
 bash scripts/compile.sh
 
-mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 256 256 256 1 1 1 10
+mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 256 256 8 1 1 1 10
 ```
 
 #### Result
@@ -65,7 +65,7 @@ mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 32 32 32 4 4 1 10
 cd flow
 bash scripts/compile.sh
 
-mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 8 8 8 32 32 32 10
+mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 8 8 8 32 32 1 10
 ```
 
 #### Result
