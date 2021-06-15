@@ -1,8 +1,9 @@
 #include <mpi.h>
+#include <CL/sycl.hpp>
+#include <dpc_common.hpp>
+#include <tuple>
 #include <cstdlib>
 #include <iostream>
-#include <tuple>
-#include <stdlib.h>
 
 #ifndef VARTYPE
   #define VARTYPE double
@@ -166,179 +167,185 @@ fill_feq(VARTYPE rho, VARTYPE ux, VARTYPE uy, VARTYPE uz, VARTYPE* f)
   return;
 }
 
-void
-collide_d3q27(VARTYPE* T, size_t npx, size_t npy, size_t npz, size_t np)
-{
-  VARTYPE feq[NM * NG] = {0};
-  VARTYPE rho, ux, uy, uz;
-  for (size_t z = np; z <= npz-(np+1); z++) {
-    for (size_t y = np; y <= npy-(np+1); y++) {
-      for (size_t x = np; x <= npx-(np+1); x++) {
-        for (size_t g = 0; g < NG; g++) {
-          for (size_t m = 0; m < NM; m++) {
-            feq[m + NM * g] = T[idx(m,x,y,z,g,npx,npy,npz)];
-          }
-        }
-        fill_moments(feq, &rho, &ux, &uy, &uz);
-        fill_feq(rho, ux, uy, uz, feq);
-        for (size_t g = 0; g < NG; g++) {
-          for (size_t m = 0; m < NM; m++) {
-            T[idx(m,x,y,z,g,npx,npy,npz)] = (1. - BETA2) * T[idx(m,x,y,z,g,npx,npy,npz)]
-                                            + BETA2 * feq[m + NM * g];
-          }
-        }
-      }
-    }
-  }
-  return;
-}
-
-void
-collide_blocks_d3q27(VARTYPE* T, size_t npx, size_t npy, size_t npz, size_t np, size_t nbx, size_t nby, size_t nbz)
-{
-  const size_t bsize = NM * npx * npy * npz * NG;
-  for (size_t b = 0; b < (nbx * nby * nbz); b++) {
-    collide_d3q27(&T[bsize * b], npx, npy, npz, np);
-  }
-  return;
-}
-
-void
-advect_d3q27(VARTYPE* T, size_t npx, size_t npy, size_t npz, size_t np)
-{
-  for (size_t z = np; z <= npz-(np+1); z++) {
-    for (size_t y = np; y <= npy-(np+1); y++) {
-      for (size_t x = np; x <= npx-(np+1); x++) {
-        T[idx(0,x,y,z,0,npx,npy,npz)] = T[idx(0,x-1,y-1,z+1,0,npx,npy,npz)];
-        T[idx(1,x,y,z,0,npx,npy,npz)] = T[idx(1,x+0,y-1,z+1,0,npx,npy,npz)];
-        T[idx(2,x,y,z,0,npx,npy,npz)] = T[idx(2,x+1,y-1,z+1,0,npx,npy,npz)];
-        T[idx(3,x,y,z,0,npx,npy,npz)] = T[idx(3,x-1,y+0,z+1,0,npx,npy,npz)];
-        T[idx(4,x,y,z,0,npx,npy,npz)] = T[idx(4,x+0,y+0,z+1,0,npx,npy,npz)];
-        T[idx(5,x,y,z,0,npx,npy,npz)] = T[idx(5,x+1,y+0,z+1,0,npx,npy,npz)];
-        T[idx(6,x,y,z,0,npx,npy,npz)] = T[idx(6,x-1,y+1,z+1,0,npx,npy,npz)];
-      }
-    }
-  }
-  for (size_t z = npz-(np+1); z >= np; z--) {
-    for (size_t y = npy-(np+1); y >= np; y--) {
-      for (size_t x = npx-(np+1); x >= np; x--) {
-        T[idx(0,x,y,z,1,npx,npy,npz)] = T[idx(0,x+1,y+1,z-1,1,npx,npy,npz)];
-        T[idx(1,x,y,z,1,npx,npy,npz)] = T[idx(1,x+0,y+1,z-1,1,npx,npy,npz)];
-        T[idx(2,x,y,z,1,npx,npy,npz)] = T[idx(2,x-1,y+1,z-1,1,npx,npy,npz)];
-        T[idx(3,x,y,z,1,npx,npy,npz)] = T[idx(3,x+1,y+0,z-1,1,npx,npy,npz)];
-        T[idx(4,x,y,z,1,npx,npy,npz)] = T[idx(4,x+0,y+0,z-1,1,npx,npy,npz)];
-        T[idx(5,x,y,z,1,npx,npy,npz)] = T[idx(5,x-1,y+0,z-1,1,npx,npy,npz)];
-        T[idx(6,x,y,z,1,npx,npy,npz)] = T[idx(6,x+1,y-1,z-1,1,npx,npy,npz)];
-      }
-    }
-  }
-  for (size_t z = np; z <= npz-(np+1); z++) {
-    for (size_t y = np; y <= npy-(np+1); y++) {
-      for (size_t x = np; x <= npx-(np+1); x++) {
-        T[idx(0,x,y,z,2,npx,npy,npz)] = T[idx(0,x+0,y+1,z+1,2,npx,npy,npz)];
-        T[idx(1,x,y,z,2,npx,npy,npz)] = T[idx(1,x+1,y+1,z+1,2,npx,npy,npz)];
-        T[idx(2,x,y,z,2,npx,npy,npz)] = T[idx(2,x+0,y+0,z+0,2,npx,npy,npz)];
-        T[idx(3,x,y,z,2,npx,npy,npz)] = T[idx(3,x+1,y+0,z+0,2,npx,npy,npz)];
-        T[idx(4,x,y,z,2,npx,npy,npz)] = T[idx(4,x-1,y+1,z+0,2,npx,npy,npz)];
-        T[idx(5,x,y,z,2,npx,npy,npz)] = T[idx(5,x+0,y+1,z+0,2,npx,npy,npz)];
-        T[idx(6,x,y,z,2,npx,npy,npz)] = T[idx(6,x+1,y+1,z+0,2,npx,npy,npz)];
-      }
-    }
-  }
-  for (size_t z = npz-(np+1); z >= np; z--) {
-    for (size_t y = npy-(np+1); y >= np; y--) {
-      for (size_t x = npx-(np+1); x >= np; x--) {
-        T[idx(0,x,y,z,3,npx,npy,npz)] = T[idx(0,x+0,y-1,z-1,3,npx,npy,npz)];
-        T[idx(1,x,y,z,3,npx,npy,npz)] = T[idx(1,x-1,y-1,z-1,3,npx,npy,npz)];
-        T[idx(2,x,y,z,3,npx,npy,npz)] = T[idx(2,x+0,y+0,z+0,3,npx,npy,npz)];
-        T[idx(3,x,y,z,3,npx,npy,npz)] = T[idx(3,x-1,y+0,z+0,3,npx,npy,npz)];
-        T[idx(4,x,y,z,3,npx,npy,npz)] = T[idx(4,x+1,y-1,z+0,3,npx,npy,npz)];
-        T[idx(5,x,y,z,3,npx,npy,npz)] = T[idx(5,x+0,y-1,z+0,3,npx,npy,npz)];
-        T[idx(6,x,y,z,3,npx,npy,npz)] = T[idx(6,x-1,y-1,z+0,3,npx,npy,npz)];
-      }
-    }
-  }
-  return;
-}
-
-void
-advect_blocks_d3q27(VARTYPE* T, size_t npx, size_t npy, size_t npz, size_t np, size_t nbx, size_t nby, size_t nbz)
-{
-  const size_t bsize = NM * npx * npy * npz * NG;
-  for (size_t b = 0; b < (nbx * nby * nbz); b++) {
-    advect_d3q27(&T[bsize * b], npx, npy, npz, np);
-  }
-  return;
-}
-
-void
-initialise(VARTYPE* T, size_t npx, size_t npy, size_t npz, size_t np, VARTYPE rho, VARTYPE ux, VARTYPE uy, VARTYPE uz)
-{
-  VARTYPE feq[NM * NG] = {0};
-  for (size_t z = 0; z <= npz-1; z++) {
-    for (size_t y = 0; y <= npy-1; y++) {
-      for (size_t x = 0; x <= npx-1; x++) {
-        fill_feq(rho, ux, uy, uz, feq);
-        for (size_t g = 0; g < NG; g++) {
-          for (size_t m = 0; m < NM; m++) {
-            T[idx(m,x,y,z,g,npx,npy,npz)] = feq[m + NM * g];
-          }
-        }
-      }
-    }
-  }
-  return;
-}
-
-void
-initialise_blocks(VARTYPE* T, size_t npx, size_t npy, size_t npz, size_t np, size_t nbx, size_t nby, size_t nbz, VARTYPE rho, VARTYPE ux, VARTYPE uy, VARTYPE uz)
-{
-  const size_t bsize = NM * npx * npy * npz * NG;
-  for (size_t b = 0; b < (nbx * nby * nbz); b++) {
-    initialise(&T[bsize * b], npx, npy, npz, np, rho, ux, uy, uz);
-  }
-  return;
-}
-
 std::tuple<double, double, VARTYPE, VARTYPE, VARTYPE, VARTYPE>
-run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t nt, MPI_Comm mpi_comm)
+run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t nt, MPI_Comm mpi_comm, sycl::device& d)
 {
   const size_t np = 1;
   const size_t npx = nx + 2 * np;
   const size_t npy = ny + 2 * np;
   const size_t npz = nz + 2 * np;
 
-  const size_t alloc_bytes = NM * (npx * npy * npz) * NG * (nbx * nby * nbz) * sizeof(VARTYPE);
-  const size_t moffset = 512 - 1;
-  VARTYPE* uT = (VARTYPE*)malloc(alloc_bytes + moffset);
-  VARTYPE *T = (VARTYPE*)(((size_t)uT + moffset) & ~moffset);
-  
-  initialise_blocks(T, npx, npy, npz, np, nbx, nby, nbz, 1., 0., 0., 0.);
+  sycl::property_list properties{ sycl::property::queue::in_order() };
+  sycl::queue q(d, dpc_common::exception_handler, properties);
 
-  double collide_time = 0, advect_time = 0;
-  for (size_t t = 0; t < nt; t++) {
-    MPI_Barrier(mpi_comm);
-    double tic1 = MPI_Wtime();
-    collide_blocks_d3q27(T, npx, npy, npz, np, nbx, nby, nbz);
-    MPI_Barrier(mpi_comm);
-    double tic2 = MPI_Wtime();
-    advect_blocks_d3q27(T, npx, npy, npz, np, nbx, nby, nbz);
-    MPI_Barrier(mpi_comm);
-    double tic3 = MPI_Wtime();
-    collide_time += tic2 - tic1;
-    advect_time += tic3 - tic2;
+  const size_t alloc_bytes = NM * (npx * npy * npz) * NG * (nbx * nby * nbz) * sizeof(VARTYPE);
+  VARTYPE* T = (VARTYPE*)sycl::malloc_device(alloc_bytes, q);
+  VARTYPE* Tnew = (VARTYPE*)sycl::malloc_device(alloc_bytes, q);
+
+  sycl::range<3> threads = { npx * nbx, npy * nby, npz * nbz };
+  sycl::range<3> wg = { npx, npy, npz };
+  const size_t bsize = NM * (npx * npy * npz) * NG;
+
+  // initialise
+  auto initialise_blocks = [&](sycl::handler& h) {
+    h.parallel_for(sycl::nd_range<3>(threads, wg), [=](sycl::nd_item<3> it) {
+      const size_t bx = it.get_group(0);
+      const size_t by = it.get_group(1);
+      const size_t bz = it.get_group(2);
+      const size_t bidx  = (bx + nbx * (by + nby * bz));
+      VARTYPE* b = &T[bsize * bidx]; 
+      VARTYPE* bnew = &Tnew[bsize * bidx];
+
+      const int x = it.get_local_id(0);
+      const int y = it.get_local_id(1);
+      const int z = it.get_local_id(2);
+
+      VARTYPE feq[NM * NG] = {0};
+      VARTYPE rho = 1., ux = 0., uy = 0., uz = 0.;
+      fill_feq(rho, ux, uy, uz, feq);
+      for (size_t g = 0; g < NG; g++) {
+        for (size_t m = 0; m < NM; m++) {
+          b[idx(m,x,y,z,g,npx,npy,npz)] = feq[m + NM * g];
+          bnew[idx(m,x,y,z,g,npx,npy,npz)] = feq[m + NM * g];
+        }
+      }
+    });
+  };
+
+  try {
+    q.submit(initialise_blocks);
+    q.wait();
+  } catch (sycl::exception const& ex) {
+    std::cerr << "dpcpp error: " << ex.what() << std::endl;
   }
 
+  // collide
+  auto collide_blocks_d3q27 = [&](sycl::handler& h) {
+    h.parallel_for(sycl::nd_range<3>(threads, wg), [=](sycl::nd_item<3> it) {
+      const size_t bx = it.get_group(0);
+      const size_t by = it.get_group(1);
+      const size_t bz = it.get_group(2);
+      const size_t bidx  = (bx + nbx * (by + nby * bz));
+      VARTYPE* b = &T[bsize * bidx]; 
+
+      const int x = it.get_local_id(0);
+      const int y = it.get_local_id(1);
+      const int z = it.get_local_id(2);
+
+      if (z >= np and z <= npz-(np+1)) {
+        if (y >= np and y <= npy-(np+1)) {
+          if (x >= np and x <= npx-(np+1)) {
+            VARTYPE feq[NM * NG] = {0};
+            VARTYPE rho, ux, uy, uz;
+            for (size_t g = 0; g < NG; g++) {
+              for (size_t m = 0; m < NM; m++) {
+                feq[m + NM * g] = b[idx(m,x,y,z,g,npx,npy,npz)];
+              }
+            }
+            fill_moments(feq, &rho, &ux, &uy, &uz);
+            fill_feq(rho, ux, uy, uz, feq);
+            for (size_t g = 0; g < NG; g++) {
+              for (size_t m = 0; m < NM; m++) {
+                b[idx(m,x,y,z,g,npx,npy,npz)] = (1. - BETA2) * b[idx(m,x,y,z,g,npx,npy,npz)]
+                                                + BETA2 * feq[m + NM * g];
+              }
+            }
+          }
+        }
+      }
+    });
+  };
+
+  // advect
+  auto advect_blocks_d3q27 = [&](sycl::handler& h) {
+    h.parallel_for(sycl::nd_range<3>(threads, wg), [=](sycl::nd_item<3> it) {
+      const size_t bx = it.get_group(0);
+      const size_t by = it.get_group(1);
+      const size_t bz = it.get_group(2);
+      const size_t bidx  = (bx + nbx * (by + nby * bz));
+      VARTYPE* b = &T[bsize * bidx]; 
+      VARTYPE* bnew = &Tnew[bsize * bidx];
+
+      const int x = it.get_local_id(0);
+      const int y = it.get_local_id(1);
+      const int z = it.get_local_id(2);
+
+      if (z >= np and z <= npz-(np+1)) {
+        if (y >= np and y <= npy-(np+1)) {
+          if (x >= np and x <= npx-(np+1)) {
+            bnew[idx(0,x,y,z,0,npx,npy,npz)] = b[idx(0,x-1,y-1,z+1,0,npx,npy,npz)];
+            bnew[idx(1,x,y,z,0,npx,npy,npz)] = b[idx(1,x+0,y-1,z+1,0,npx,npy,npz)];
+            bnew[idx(2,x,y,z,0,npx,npy,npz)] = b[idx(2,x+1,y-1,z+1,0,npx,npy,npz)];
+            bnew[idx(3,x,y,z,0,npx,npy,npz)] = b[idx(3,x-1,y+0,z+1,0,npx,npy,npz)];
+            bnew[idx(4,x,y,z,0,npx,npy,npz)] = b[idx(4,x+0,y+0,z+1,0,npx,npy,npz)];
+            bnew[idx(5,x,y,z,0,npx,npy,npz)] = b[idx(5,x+1,y+0,z+1,0,npx,npy,npz)];
+            bnew[idx(6,x,y,z,0,npx,npy,npz)] = b[idx(6,x-1,y+1,z+1,0,npx,npy,npz)];
+
+            bnew[idx(0,x,y,z,1,npx,npy,npz)] = b[idx(0,x+1,y+1,z-1,1,npx,npy,npz)];
+            bnew[idx(1,x,y,z,1,npx,npy,npz)] = b[idx(1,x+0,y+1,z-1,1,npx,npy,npz)];
+            bnew[idx(2,x,y,z,1,npx,npy,npz)] = b[idx(2,x-1,y+1,z-1,1,npx,npy,npz)];
+            bnew[idx(3,x,y,z,1,npx,npy,npz)] = b[idx(3,x+1,y+0,z-1,1,npx,npy,npz)];
+            bnew[idx(4,x,y,z,1,npx,npy,npz)] = b[idx(4,x+0,y+0,z-1,1,npx,npy,npz)];
+            bnew[idx(5,x,y,z,1,npx,npy,npz)] = b[idx(5,x-1,y+0,z-1,1,npx,npy,npz)];
+            bnew[idx(6,x,y,z,1,npx,npy,npz)] = b[idx(6,x+1,y-1,z-1,1,npx,npy,npz)];
+    
+            bnew[idx(0,x,y,z,2,npx,npy,npz)] = b[idx(0,x+0,y+1,z+1,2,npx,npy,npz)];
+            bnew[idx(1,x,y,z,2,npx,npy,npz)] = b[idx(1,x+1,y+1,z+1,2,npx,npy,npz)];
+            bnew[idx(2,x,y,z,2,npx,npy,npz)] = b[idx(2,x+0,y+0,z+0,2,npx,npy,npz)];
+            bnew[idx(3,x,y,z,2,npx,npy,npz)] = b[idx(3,x+1,y+0,z+0,2,npx,npy,npz)];
+            bnew[idx(4,x,y,z,2,npx,npy,npz)] = b[idx(4,x-1,y+1,z+0,2,npx,npy,npz)];
+            bnew[idx(5,x,y,z,2,npx,npy,npz)] = b[idx(5,x+0,y+1,z+0,2,npx,npy,npz)];
+            bnew[idx(6,x,y,z,2,npx,npy,npz)] = b[idx(6,x+1,y+1,z+0,2,npx,npy,npz)];
+    
+            bnew[idx(0,x,y,z,3,npx,npy,npz)] = b[idx(0,x+0,y-1,z-1,3,npx,npy,npz)];
+            bnew[idx(1,x,y,z,3,npx,npy,npz)] = b[idx(1,x-1,y-1,z-1,3,npx,npy,npz)];
+            bnew[idx(2,x,y,z,3,npx,npy,npz)] = b[idx(2,x+0,y+0,z+0,3,npx,npy,npz)];
+            bnew[idx(3,x,y,z,3,npx,npy,npz)] = b[idx(3,x-1,y+0,z+0,3,npx,npy,npz)];
+            bnew[idx(4,x,y,z,3,npx,npy,npz)] = b[idx(4,x+1,y-1,z+0,3,npx,npy,npz)];
+            bnew[idx(5,x,y,z,3,npx,npy,npz)] = b[idx(5,x+0,y-1,z+0,3,npx,npy,npz)];
+            bnew[idx(6,x,y,z,3,npx,npy,npz)] = b[idx(6,x-1,y-1,z+0,3,npx,npy,npz)];
+          }
+        }
+      }
+    });
+  };
+
+  double collide_time = 0, advect_time = 0;
+  try {
+    for (size_t t = 0; t < nt; t++) {
+      MPI_Barrier(mpi_comm);
+      q.wait();
+      double tic1 = MPI_Wtime();
+      q.submit(collide_blocks_d3q27);
+      q.wait();
+      MPI_Barrier(mpi_comm);
+      q.wait();
+      double tic2 = MPI_Wtime();
+      q.submit(advect_blocks_d3q27);
+      q.wait();
+      std::swap(T, Tnew);
+      MPI_Barrier(mpi_comm);
+      double tic3 = MPI_Wtime();
+      collide_time += tic2 - tic1;
+      advect_time += tic3 - tic2;
+    }
+  } catch (sycl::exception const& ex) {
+    std::cerr << "dpcpp error: " << ex.what() << std::endl;
+  }
+
+  VARTYPE sample_val;
+  q.memcpy(&sample_val, &T[np + npx * (np + npy * np)], sizeof(VARTYPE));
   VARTYPE feq[NM * NG];
   for (size_t g = 0; g < NG; g++) {
     for (size_t m = 0; m < NM; m++) {
-      feq[m + NM * g] = T[idx(m,np,np,np,g,npx,npy,npz)];
+      q.memcpy(&feq[m + NM * g], &T[idx(m,np,np,np,g,npx,npy,npz)], sizeof(VARTYPE));
     }
   }
   VARTYPE rho, ux, uy, uz;
   fill_moments(feq, &rho, &ux, &uy, &uz);
 
-  free(uT);
+  sycl::free(T, q);
+  sycl::free(Tnew, q);
 
   return std::make_tuple(collide_time, advect_time, rho, ux, uy, uz);
 }
@@ -352,6 +359,9 @@ main(int argc, char* argv[])
   MPI_Comm_rank(mpi_comm, &mpi_rank);
   MPI_Comm_size(mpi_comm, &mpi_size);
 
+  sycl::default_selector d_selector;
+  sycl::device d = sycl::device(d_selector);
+
   const size_t nx  = atoi(argv[1]);
   const size_t ny  = atoi(argv[2]);
   const size_t nz  = atoi(argv[3]);
@@ -360,15 +370,7 @@ main(int argc, char* argv[])
   const size_t nbz = atoi(argv[6]);
   const size_t nt  = atoi(argv[7]);
 
-  if ((nx % 8) != 0) {
-    if (0 == mpi_rank) {
-      std::cerr << "error: nx must be a multiple of 8" << std::endl;
-    }
-    MPI_Abort(mpi_comm, 2);
-    exit(1);
-  }
-
-  auto res = run(nx, ny, nz, nbx, nby, nbz, nt, mpi_comm);
+  auto res = run(nx, ny, nz, nbx, nby, nbz, nt, mpi_comm, d);
   if (0 == mpi_rank) {
     std::cout << nx << ", ";
     std::cout << ny << ", ";

@@ -21,7 +21,7 @@ mpirun -n 72 --bind-to core:1 ./bin/thermal_mpi nx ny nz nbx nby nbz nt
 
 ```
 cd thermal
-bash scripts/compile.sh
+bash compile.sh
 
 mpirun -n 72 --bind-to core:1 ./bin/thermal_mpi 256 256 256 1 1 1 10
 ```
@@ -39,7 +39,7 @@ mpirun -n 72 --bind-to core:1 ./bin/thermal_mpi 256 256 256 1 1 1 10
 
 ```
 cd thermal
-bash scripts/compile.sh
+bash compile.sh
 
 mpirun -n 72 --bind-to core:1 ./bin/thermal_mpi 8 8 8 32 32 32 10
 ```
@@ -59,7 +59,7 @@ A grid with `(nbx,nby,nbz)` blocks, each block containing
 
 ```
 cd thermal
-bash scripts/compile.sh
+bash compile.sh
 
 ./bin/thermal_dpcpp 8 8 8 135 135 135 10
 ```

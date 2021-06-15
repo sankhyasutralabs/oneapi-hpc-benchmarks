@@ -23,7 +23,7 @@ mpirun -n 72 --bind-to core:1 ./bin/flow_mpi nx ny nz nbx nby nbz nt
 
 ```
 cd flow
-bash scripts/compile.sh
+bash compile.sh
 
 mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 256 256 8 1 1 1 10
 ```
@@ -31,19 +31,19 @@ mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 256 256 8 1 1 1 10
 #### Result
 
 - Data Traffic = `32 x (256 x 256 x 8) points per block x (1 x 1 x 1) blocks x 8 bytes x 72 processes` = **9.66 GB**
-- collide took walltime of 3.00 seconds for 10 iterations = **0.300 s** per iteration
+- collide took walltime of 0.66 seconds for 10 iterations = **0.066 s** per iteration
 - advect took walltime of 0.96 seconds for 10 iterations = **0.096 s** per iteration
 - assuming `m` memory operations, effective bandwidth used = `data size x m / time per iteration`
 - STREAM Triad bandwidth = 320 GB/s
-- effective number of operations used in **collide** `m = 320 / (9.66 / 0.300)` = **9.93 ops**
-- effective number of operations used in **advect** `m = 320 / (9.66 / 0.096)` = **3.18 ops**
+- effective number of operations used in **collide** `m = 320 / (9.66 / 0.066)` = **2.18 ops**
+- effective number of operations used in **advect** `m = 320 / (9.66 / 0.096)` = **3.19 ops**
 
 
 ### Case: Few medium blocks
 
 ```
 cd flow
-bash scripts/compile.sh
+bash compile.sh
 
 mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 32 32 32 4 4 1 10
 ```
@@ -51,19 +51,19 @@ mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 32 32 32 4 4 1 10
 #### Result
 
 - Data Traffic = `32 x (32 x 32 x 32) points per block x (4 x 4 x 1) blocks x 8 bytes x 72 processes` = **9.66 GB**
-- collide took walltime of 3.33 seconds for 10 iterations = **0.333 s** per iteration
-- advect took walltime of 0.69 seconds for 10 iterations = **0.069 s** per iteration
+- collide took walltime of 0.68 seconds for 10 iterations = **0.068 s** per iteration
+- advect took walltime of 0.71 seconds for 10 iterations = **0.071 s** per iteration
 - assuming `m` memory operations, effective bandwidth used = `data size x m / time per iteration`
 - STREAM Triad bandwidth = 320 GB/s
-- effective number of operations used in **collide** `m = 320 / (9.66 / 0.333)` = **11.03 ops**
-- effective number of operations used in **advect** `m = 320 / (9.66 / 0.069)` = **2.28 ops**
+- effective number of operations used in **collide** `m = 320 / (9.66 / 0.068)` = **2.25 ops**
+- effective number of operations used in **advect** `m = 320 / (9.66 / 0.071)` = **2.34 ops**
 
 
 ### Case: Many small blocks
 
 ```
 cd flow
-bash scripts/compile.sh
+bash compile.sh
 
 mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 8 8 8 32 32 1 10
 ```
@@ -71,17 +71,30 @@ mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 8 8 8 32 32 1 10
 #### Result
 
 - Data Traffic = `32 x (8 x 8 x 8) points per block x (32 x 32 x 1) blocks x 8 bytes x 72 processes` = **9.66 GB**
-- collide took walltime of 3.31 seconds for 10 iterations = **0.331 s** per iteration
-- advect took walltime of 0.86 seconds for 10 iterations = **0.086 s** per iteration
+- collide took walltime of 0.81 seconds for 10 iterations = **0.081 s** per iteration
+- advect took walltime of 0.87 seconds for 10 iterations = **0.087 s** per iteration
 - assuming `m` memory operations, effective bandwidth used = `data size x m / time per iteration`
 - STREAM Triad bandwidth = 320 GB/s
-- effective number of operations used in **collide** `m = 320 / (9.66 / 0.331)` = **10.96 ops**
-- effective number of operations used in **advect** `m = 320 / (9.66 / 0.086)` = **2.84 ops**
+- effective number of operations used in **collide** `m = 320 / (9.66 / 0.081)` = **2.70 ops**
+- effective number of operations used in **advect** `m = 320 / (9.66 / 0.087)` = **2.90 ops**
 
-## C++ with MPI and collide kernel using intrinsics
+## DPC++
 
-Improved effective number of operations used in collide kernel
+Double memory advection and pointer swap.
 
-- Case: One large block: **2.08 ops**
-- Case: Few medium blocks: **2.15 ops**
-- Case: Many small blocks: **2.46 ops**
+```
+cd flow
+bash compile.sh
+
+./bin/flow_dpcpp 8 8 8 32 32 72 10
+```
+
+#### Result
+
+- Data Traffic = `32 x (8 x 8 x 8) points per block x (32 x 32 x 72) blocks x 8 bytes` = **9.66 GB**
+- collide took walltime of 1.04 seconds for 10 iterations = **0.104 s** per iteration
+- advect took walltime of 1.82 seconds for 10 iterations = **0.182 s** per iteration
+- assuming `m` memory operations, effective bandwidth used = `data size x m / time per iteration`
+- STREAM Triad bandwidth = 320 GB/s
+- effective number of operations used in **collide** `m = 320 / (9.66 / 0.104)` = **3.44 ops**
+- effective number of operations used in **advect** `m = 320 / (9.66 / 0.182)` = **6.02 ops**
