@@ -80,7 +80,7 @@ mpirun -n 72 --bind-to core:1 ./bin/flow_mpi 8 8 8 32 32 1 10
 
 ## DPC++
 
-Double memory advection and pointer swap.
+### Double memory advection and pointer swap
 
 ```
 cd flow
@@ -98,3 +98,22 @@ bash compile.sh
 - STREAM Triad bandwidth = 320 GB/s
 - effective number of operations used in **collide** `m = 320 / (9.66 / 0.104)` = **3.44 ops**
 - effective number of operations used in **advect** `m = 320 / (9.66 / 0.182)` = **6.02 ops**
+
+### Single memory advection, Whole block per thread
+
+```
+cd flow
+bash compile.sh
+
+./bin/flow_dpcpp_block 8 8 8 32 32 72 10
+```
+
+#### Result
+
+- Data Traffic = `32 x (8 x 8 x 8) points per block x (32 x 32 x 72) blocks x 8 bytes` = **9.66 GB**
+- collide took walltime of 1.08 seconds for 10 iterations = **0.108 s** per iteration
+- advect took walltime of 1.27 seconds for 10 iterations = **0.127 s** per iteration
+- assuming `m` memory operations, effective bandwidth used = `data size x m / time per iteration`
+- STREAM Triad bandwidth = 320 GB/s
+- effective number of operations used in **collide** `m = 320 / (9.66 / 0.108)` = **3.57 ops**
+- effective number of operations used in **advect** `m = 320 / (9.66 / 0.127)` = **4.19 ops**
