@@ -69,7 +69,7 @@ initialise_blocks(VARTYPE* T, size_t npx, size_t npy, size_t npz, size_t np, siz
   return;
 }
 
-std::pair<double, VARTYPE>
+std::pair<float, VARTYPE>
 run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t nt, MPI_Comm mpi_comm)
 {
   const size_t np = 1;
@@ -85,14 +85,14 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   initialise_blocks(Tnew, npx, npy, npz, np, nbx, nby, nbz, 10., 100.);
 
   MPI_Barrier(mpi_comm);
-  double tic = MPI_Wtime();
+  float tic = MPI_Wtime();
   for (size_t t = 0; t < nt; t++) {
     diffuse_blocks_d3q7(T, Tnew, npx, npy, npz, np, nbx, nby, nbz, 0.1);
     MPI_Barrier(mpi_comm);
     std::swap(T, Tnew);
   }
   MPI_Barrier(mpi_comm);
-  double toc = MPI_Wtime();
+  float toc = MPI_Wtime();
 
   VARTYPE sample_val = T[idx(np,np,np,npx,npy,npz)];
 

@@ -300,7 +300,7 @@ initialise_blocks(VARTYPE* T, size_t npx, size_t npy, size_t npz, size_t np, siz
   return;
 }
 
-std::tuple<double, double, VARTYPE, VARTYPE, VARTYPE, VARTYPE>
+std::tuple<float, float, VARTYPE, VARTYPE, VARTYPE, VARTYPE>
 run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t nt, MPI_Comm mpi_comm)
 {
   const size_t np = 1;
@@ -315,16 +315,16 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   
   initialise_blocks(T, npx, npy, npz, np, nbx, nby, nbz, 1., 0., 0., 0.);
 
-  double collide_time = 0, advect_time = 0;
+  float collide_time = 0, advect_time = 0;
   for (size_t t = 0; t < nt; t++) {
     MPI_Barrier(mpi_comm);
-    double tic1 = MPI_Wtime();
+    float tic1 = MPI_Wtime();
     collide_blocks_d3q27(T, npx, npy, npz, np, nbx, nby, nbz);
     MPI_Barrier(mpi_comm);
-    double tic2 = MPI_Wtime();
+    float tic2 = MPI_Wtime();
     advect_blocks_d3q27(T, npx, npy, npz, np, nbx, nby, nbz);
     MPI_Barrier(mpi_comm);
-    double tic3 = MPI_Wtime();
+    float tic3 = MPI_Wtime();
     collide_time += tic2 - tic1;
     advect_time += tic3 - tic2;
   }

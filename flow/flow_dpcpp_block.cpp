@@ -167,7 +167,7 @@ fill_feq(VARTYPE rho, VARTYPE ux, VARTYPE uy, VARTYPE uz, VARTYPE* f)
   return;
 }
 
-std::tuple<double, double, VARTYPE, VARTYPE, VARTYPE, VARTYPE>
+std::tuple<float, float, VARTYPE, VARTYPE, VARTYPE, VARTYPE>
 run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t nt, MPI_Comm mpi_comm, sycl::device& d)
 {
   const size_t np = 1;
@@ -315,21 +315,21 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
     });
   };
 
-  double collide_time = 0, advect_time = 0;
+  float collide_time = 0, advect_time = 0;
   try {
     for (size_t t = 0; t < nt; t++) {
       MPI_Barrier(mpi_comm);
       q.wait();
-      double tic1 = MPI_Wtime();
+      float tic1 = MPI_Wtime();
       q.submit(collide_blocks_d3q27);
       q.wait();
       MPI_Barrier(mpi_comm);
       q.wait();
-      double tic2 = MPI_Wtime();
+      float tic2 = MPI_Wtime();
       q.submit(advect_blocks_d3q27);
       q.wait();
       MPI_Barrier(mpi_comm);
-      double tic3 = MPI_Wtime();
+      float tic3 = MPI_Wtime();
       collide_time += tic2 - tic1;
       advect_time += tic3 - tic2;
     }

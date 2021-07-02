@@ -15,7 +15,7 @@ idx(size_t x, size_t y, size_t z, size_t npx, size_t npy, size_t npz)
   return x + npx * (y + npy * z);
 }
 
-std::pair<double, VARTYPE>
+std::pair<float, VARTYPE>
 run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t nt, MPI_Comm mpi_comm, sycl::device& d)
 {
   const size_t np = 1;
@@ -101,7 +101,7 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   };
 
   MPI_Barrier(mpi_comm);
-  double tic = MPI_Wtime();
+  float tic = MPI_Wtime();
   try {
     for (size_t t = 0; t < nt; t++) {
       q.submit(diffuse_blocks_d3q7);
@@ -114,7 +114,7 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   }
   q.wait();
   MPI_Barrier(mpi_comm);
-  double toc = MPI_Wtime();
+  float toc = MPI_Wtime();
 
   VARTYPE sample_val;
   q.memcpy(&sample_val, &T[np + npx * (np + npy * np)], sizeof(VARTYPE));
