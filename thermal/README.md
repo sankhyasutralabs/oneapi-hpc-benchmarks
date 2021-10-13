@@ -61,13 +61,13 @@ A grid with `(nbx,nby,nbz)` blocks, each block containing
 cd thermal
 bash compile.sh
 
-./bin/thermal_dpcpp 8 8 8 135 135 135 10
+DPCPP_CPU_PLACES=numa_domains ./bin/thermal_dpcpp 8 8 8 135 135 135 10
 ```
 
 ### Result
 
 - Data Traffic = `(8 x 8 x 8) points per block x (135 x 135 x 135) blocks x 8 bytes` = **10.07 GB**
-- took walltime of 2.68 seconds for 10 iterations = **0.268 s** per iteration
-- assuming `m` memory operations, effective bandwidth used = `10.07 m / 0.268 = 37.5 m GB/s`
+- took walltime of 1.76 seconds for 10 iterations = **0.176 s** per iteration
+- assuming `m` memory operations, effective bandwidth used = `10.07 m / 0.176 = 57.21 m GB/s`
 - STREAM Triad bandwidth = 320 GB/s
-- effective number of operations `m = 320 / 37.5` = **8.533 ops**
+- effective number of operations `m = 320 / 57.21` = **5.6 ops**
