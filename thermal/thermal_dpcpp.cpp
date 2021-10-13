@@ -4,6 +4,7 @@
 #include <utility>
 #include <cstdlib>
 #include <iostream>
+#include <chrono>
 
 #ifndef VARTYPE
   #define VARTYPE double
@@ -30,22 +31,22 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   VARTYPE* T = (VARTYPE*)sycl::malloc_device(alloc_bytes, q);
   VARTYPE* Tnew = (VARTYPE*)sycl::malloc_device(alloc_bytes, q);
 
-  sycl::range<3> threads = { npx * nbx, npy * nby, npz * nbz };
-  sycl::range<3> wg = { npx, npy, npz };
+  sycl::range<3> threads = { npz * nbz, npy * nby, npx * nbx };
+  sycl::range<3> wg = { npz, npy, npx };
   const size_t bsize = (npx * npy * npz);
 
   // initialise
   auto initialise = [=](sycl::nd_item<3> it) {
-    const size_t bx = it.get_group(0);
+    const size_t bx = it.get_group(2);
     const size_t by = it.get_group(1);
-    const size_t bz = it.get_group(2);
+    const size_t bz = it.get_group(0);
     const size_t bidx  = (bx + nbx * (by + nby * bz));
     VARTYPE* b = &T[bsize * bidx]; 
     VARTYPE* bnew = &Tnew[bsize * bidx];
 
-    const int x = it.get_local_id(0);
+    const int x = it.get_local_id(2);
     const int y = it.get_local_id(1);
-    const int z = it.get_local_id(2);
+    const int z = it.get_local_id(0);
 
     const VARTYPE Tbc = 100.;
     const VARTYPE Tbulk = 10.;
@@ -75,16 +76,16 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
 
   auto diffuse_blocks_d3q7 = [&](sycl::handler& h) {
     h.parallel_for(sycl::nd_range<3>(threads, wg), [=](sycl::nd_item<3> it) {
-    const size_t bx = it.get_group(0);
+    const size_t bx = it.get_group(2);
     const size_t by = it.get_group(1);
-    const size_t bz = it.get_group(2);
+    const size_t bz = it.get_group(0);
     const size_t bidx  = (bx + nbx * (by + nby * bz));
     VARTYPE* b = &T[bsize * bidx]; 
     VARTYPE* bnew = &Tnew[bsize * bidx];
 
-    const int x = it.get_local_id(0);
+    const int x = it.get_local_id(2);
     const int y = it.get_local_id(1);
-    const int z = it.get_local_id(2);
+    const int z = it.get_local_id(0);
 
       if (z >= np and z <= npz-(np+1)) {
         if (y >= np and y <= npy-(np+1)) {
@@ -101,7 +102,11 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   };
 
   MPI_Barrier(mpi_comm);
-  float tic = MPI_Wtime();
+  // float tic = MPI_Wtime();
+
+  double total_time = 0.0;
+  auto start_time = std::chrono::high_resolution_clock::now();
+
   try {
     for (size_t t = 0; t < nt; t++) {
       q.submit(diffuse_blocks_d3q7);
@@ -114,7 +119,9 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   }
   q.wait();
   MPI_Barrier(mpi_comm);
-  float toc = MPI_Wtime();
+  total_time += std::chrono::duration<double, std::nano>(
+                 std::chrono::high_resolution_clock::now() - start_time).count();
+  total_time *= 1E-9; //nano to seconds
 
   VARTYPE sample_val;
   q.memcpy(&sample_val, &T[np + npx * (np + npy * np)], sizeof(VARTYPE));
@@ -122,7 +129,7 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   sycl::free(T, q);
   sycl::free(Tnew, q);
 
-  return std::make_pair(toc - tic, sample_val);
+  return std::make_pair(total_time, sample_val);
 }
 
 int

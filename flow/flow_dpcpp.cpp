@@ -1,4 +1,5 @@
 #include <mpi.h>
+#include <chrono>
 #include <CL/sycl.hpp>
 #include <dpc_common.hpp>
 #include <tuple>
@@ -182,23 +183,23 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   VARTYPE* T = (VARTYPE*)sycl::malloc_device(alloc_bytes, q);
   VARTYPE* Tnew = (VARTYPE*)sycl::malloc_device(alloc_bytes, q);
 
-  sycl::range<3> threads = { npx * nbx, npy * nby, npz * nbz };
-  sycl::range<3> wg = { npx, npy, npz };
+  sycl::range<3> threads = { npz * nbz, npy * nby, npx * nbx };
+  sycl::range<3> wg = { npz, npy, npx };
   const size_t bsize = NM * (npx * npy * npz) * NG;
 
   // initialise
   auto initialise_blocks = [&](sycl::handler& h) {
     h.parallel_for(sycl::nd_range<3>(threads, wg), [=](sycl::nd_item<3> it) {
-      const size_t bx = it.get_group(0);
+      const size_t bx = it.get_group(2);
       const size_t by = it.get_group(1);
-      const size_t bz = it.get_group(2);
+      const size_t bz = it.get_group(0);
       const size_t bidx  = (bx + nbx * (by + nby * bz));
       VARTYPE* b = &T[bsize * bidx]; 
       VARTYPE* bnew = &Tnew[bsize * bidx];
 
-      const int x = it.get_local_id(0);
+      const int x = it.get_local_id(2);
       const int y = it.get_local_id(1);
-      const int z = it.get_local_id(2);
+      const int z = it.get_local_id(0);
 
       VARTYPE feq[NM * NG] = {0};
       VARTYPE rho = 1., ux = 0., uy = 0., uz = 0.;
@@ -222,15 +223,15 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   // collide
   auto collide_blocks_d3q27 = [&](sycl::handler& h) {
     h.parallel_for(sycl::nd_range<3>(threads, wg), [=](sycl::nd_item<3> it) {
-      const size_t bx = it.get_group(0);
+      const size_t bx = it.get_group(2);
       const size_t by = it.get_group(1);
-      const size_t bz = it.get_group(2);
+      const size_t bz = it.get_group(0);
       const size_t bidx  = (bx + nbx * (by + nby * bz));
       VARTYPE* b = &T[bsize * bidx]; 
 
-      const int x = it.get_local_id(0);
+      const int x = it.get_local_id(2);
       const int y = it.get_local_id(1);
-      const int z = it.get_local_id(2);
+      const int z = it.get_local_id(0);
 
       if (z >= np and z <= npz-(np+1)) {
         if (y >= np and y <= npy-(np+1)) {
@@ -259,16 +260,16 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
   // advect
   auto advect_blocks_d3q27 = [&](sycl::handler& h) {
     h.parallel_for(sycl::nd_range<3>(threads, wg), [=](sycl::nd_item<3> it) {
-      const size_t bx = it.get_group(0);
+      const size_t bx = it.get_group(2);
       const size_t by = it.get_group(1);
-      const size_t bz = it.get_group(2);
+      const size_t bz = it.get_group(0);
       const size_t bidx  = (bx + nbx * (by + nby * bz));
       VARTYPE* b = &T[bsize * bidx]; 
       VARTYPE* bnew = &Tnew[bsize * bidx];
 
-      const int x = it.get_local_id(0);
+      const int x = it.get_local_id(2);
       const int y = it.get_local_id(1);
-      const int z = it.get_local_id(2);
+      const int z = it.get_local_id(0);
 
       if (z >= np and z <= npz-(np+1)) {
         if (y >= np and y <= npy-(np+1)) {
@@ -310,24 +311,30 @@ run(size_t nx, size_t ny, size_t nz, size_t nbx, size_t nby, size_t nbz, size_t 
     });
   };
 
-  float collide_time = 0, advect_time = 0;
+  double collide_time = 0, advect_time = 0;
   try {
     for (size_t t = 0; t < nt; t++) {
       MPI_Barrier(mpi_comm);
       q.wait();
-      float tic1 = MPI_Wtime();
+      auto tic1 = std::chrono::high_resolution_clock::now();
       q.submit(collide_blocks_d3q27);
       q.wait();
       MPI_Barrier(mpi_comm);
       q.wait();
-      float tic2 = MPI_Wtime();
+      auto tic2 = std::chrono::high_resolution_clock::now();
       q.submit(advect_blocks_d3q27);
       q.wait();
       std::swap(T, Tnew);
       MPI_Barrier(mpi_comm);
-      float tic3 = MPI_Wtime();
-      collide_time += tic2 - tic1;
-      advect_time += tic3 - tic2;
+      auto tic3 = std::chrono::high_resolution_clock::now();
+      auto elapsed_time = (std::chrono::duration<double, std::nano>(
+                         tic2 - tic1).count())*1E-9;
+      collide_time += elapsed_time;
+
+      elapsed_time = (std::chrono::duration<double, std::nano>(
+                         tic3 - tic2).count())*1E-9;
+
+      advect_time += elapsed_time;
     }
   } catch (sycl::exception const& ex) {
     std::cerr << "dpcpp error: " << ex.what() << std::endl;
